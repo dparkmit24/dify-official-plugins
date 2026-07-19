@@ -23,6 +23,7 @@ from dify_plugin.entities.model.message import (
     UserPromptMessage,
     VideoPromptMessageContent,
 )
+from dify_plugin.errors.model import CredentialsValidateFailedError
 from requests import Response
 
 
@@ -173,8 +174,19 @@ class MoonshotLargeLanguageModel(OAICompatLargeLanguageModel):
 
     def _add_custom_parameters(self, credentials: dict) -> None:
         credentials["mode"] = "chat"
-        if "endpoint_url" not in credentials or credentials["endpoint_url"] == "":
-            credentials["endpoint_url"] = "https://api.moonshot.cn/v1"
+        endpoint_urls = {
+            "international": "https://api.moonshot.ai/v1",
+            "mainland_china": "https://api.moonshot.cn/v1",
+        }
+        region = credentials.get("endpoint_region")
+        endpoint_url = endpoint_urls.get(region)
+        if endpoint_url is None:
+            raise CredentialsValidateFailedError(
+                "Select an API Endpoint Region: 'international' (api.moonshot.ai) "
+                "or 'mainland_china' (api.moonshot.cn). Moonshot's international and "
+                "mainland platforms use separate, non-interchangeable API keys."
+            )
+        credentials["endpoint_url"] = endpoint_url
 
     def _add_function_call(self, model: str, credentials: dict) -> None:
         model_schema = self.get_model_schema(model, credentials)

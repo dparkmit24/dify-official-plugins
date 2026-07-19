@@ -298,7 +298,7 @@ def test_json_schema_is_sent_to_api():
         chunks = list(
             llm.invoke(
                 model=model,
-                credentials={"api_key": "test"},
+                credentials={"api_key": "test", "endpoint_region": "international"},
                 prompt_messages=[UserPromptMessage(content="Reply with JSON.")],
                 model_parameters={
                     "max_tokens": 128,

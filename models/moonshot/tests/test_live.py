@@ -55,7 +55,7 @@ def _invoke(*, stream: bool, parameters: dict) -> list:
     return list(
         llm.invoke(
             model=MODEL,
-            credentials=_Credentials(api_key=API_KEY),
+            credentials=_Credentials(api_key=API_KEY, endpoint_region="international"),
             prompt_messages=[UserPromptMessage(content="Reply with OK.")],
             model_parameters=parameters,
             stream=stream,

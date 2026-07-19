@@ -89,12 +89,19 @@ provider_credential_schema:
     type: secret-input
     variable: api_key
   - label:
-      en_US: API Base URL
-    placeholder:
-      en_US: Base URL, e.g. https://api.moonshot.cn/v1
-      zh_Hans: Base URL, 如：https://api.moonshot.cn/v1
-    required: false
-    type: text-input
-    variable: endpoint_url
+      en_US: API Endpoint Region
+      zh_Hans: API 端点区域
+    options:
+    - label:
+        en_US: International (api.moonshot.ai)
+        zh_Hans: 国际站 (api.moonshot.ai)
+      value: international
+    - label:
+        en_US: Mainland China (api.moonshot.cn)
+        zh_Hans: 中国大陆 (api.moonshot.cn)
+      value: mainland_china
+    required: true
+    type: select
+    variable: endpoint_region
 supported_model_types:
 - llm
