@@ -1,14 +1,16 @@
 import logging
 from collections.abc import Generator
+from functools import partial
 from typing import Any
 
-import nest_asyncio
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 from dify_plugin.file.file import File
 from llama_cloud_services import LlamaParse
 from llama_cloud_services.parse.utils import ResultType
 from pydantic import BaseModel
+
+from tools.native_event_loop import run_async
 
 logger = logging.getLogger(__name__)
 
@@ -36,24 +38,28 @@ class LlamaParseTool(Tool):
     def _invoke(
         self, tool_parameters: dict[str, Any]
     ) -> Generator[ToolInvokeMessage, None, None]:
-        nest_asyncio.apply()
         if tool_parameters.get("files") is None:
             raise ValueError("File is required")
         params = ToolParameters(**tool_parameters)
         files = params.files
 
-        parser = LlamaParse(
-            api_key=self.runtime.credentials.get("llama_cloud_api_key", ""),
-            result_type=params.result_type,
-            num_workers=params.num_workers,
-            verbose=params.verbose,
-            language=params.language,
-            ignore_errors=False,
-        )
         for file in files:
-            documents = parser.load_data(
-                file_path=file.blob,
-                extra_info={"file_name": file.filename},
+            # A fresh parser per file keeps its cached HTTP client on the
+            # private event loop that run_async creates for this parse.
+            parser = LlamaParse(
+                api_key=self.runtime.credentials.get("llama_cloud_api_key", ""),
+                result_type=params.result_type,
+                num_workers=params.num_workers,
+                verbose=params.verbose,
+                language=params.language,
+                ignore_errors=False,
+            )
+            documents = run_async(
+                partial(
+                    parser.aload_data,
+                    file.blob,
+                    {"file_name": file.filename},
+                )
             )
             texts = "---".join([doc.text for doc in documents])
             yield self.create_text_message(texts)

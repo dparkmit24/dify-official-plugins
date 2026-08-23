@@ -2,9 +2,9 @@ import logging
 import os
 import time
 from collections.abc import Generator
+from functools import partial
 from typing import Any, Optional
 
-import nest_asyncio
 import httpx
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
@@ -12,6 +12,8 @@ from dify_plugin.file.file import File
 from llama_cloud_services import LlamaParse
 from llama_cloud_services.parse.utils import ResultType
 from pydantic import BaseModel
+
+from tools.native_event_loop import run_async
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +152,6 @@ class LlamaParseAdvancedTool(Tool):
     def _invoke(
         self, tool_parameters: dict[str, Any]
     ) -> Generator[ToolInvokeMessage, None, None]:
-        nest_asyncio.apply()
         if tool_parameters.get("files") is None:
             raise ValueError("File is required")
         params = AdvancedToolParameters(**tool_parameters)
@@ -176,8 +177,6 @@ class LlamaParseAdvancedTool(Tool):
             parser_config["system_prompt"] = params.system_prompt
         if params.user_prompt:
             parser_config["user_prompt"] = params.user_prompt
-
-        parser = LlamaParse(**parser_config)
 
         for file in files:
             try:
@@ -206,9 +205,15 @@ class LlamaParseAdvancedTool(Tool):
 
                 # Parse the document
                 logger.info(f"Parsing file '{file.filename}' with LlamaParse LLM mode...")
-                documents = parser.load_data(
-                    file_path=file_content,
-                    extra_info={"file_name": file.filename},
+                # A fresh parser per file keeps its cached HTTP client on the
+                # private event loop that run_async creates for this parse.
+                parser = LlamaParse(**parser_config)
+                documents = run_async(
+                    partial(
+                        parser.aload_data,
+                        file_content,
+                        {"file_name": file.filename},
+                    )
                 )
                 
                 texts = "---".join([doc.text for doc in documents])
